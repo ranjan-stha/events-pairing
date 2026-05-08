@@ -1,18 +1,18 @@
 import logging
-from pathlib import Path
 from datetime import datetime
-
-import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+from pathlib import Path
 
 import matplotlib.lines as mlines
+import matplotlib.pyplot as plt
+import pandas as pd
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
 
 def plot_clusters(df: pd.DataFrame, hazard: str) -> None:
     """Plot the clusters"""
@@ -24,18 +24,12 @@ def plot_clusters(df: pd.DataFrame, hazard: str) -> None:
     # -------------------------
     # Automatically assign markers
     # -------------------------
-    available_markers = [
-        "o", "s", "^", "D", "v", "P", "*", "X",
-        "<", ">", "h", "H", "8", "p"
-    ]
+    available_markers = ["o", "s", "^", "D", "v", "P", "*", "X", "<", ">", "h", "H", "8", "p"]
 
     sources = sorted(df["source"].unique())
 
     # Map each source to a marker automatically
-    markers = {
-        src: available_markers[i % len(available_markers)]
-        for i, src in enumerate(sources)
-    }
+    markers = {src: available_markers[i % len(available_markers)] for i, src in enumerate(sources)}
 
     # -------------------------
     # Plot points
@@ -43,14 +37,7 @@ def plot_clusters(df: pd.DataFrame, hazard: str) -> None:
     for src in sources:
         sub = df[df["source"] == src]
         ax.scatter(
-            sub["lon"],
-            sub["lat"],
-            sub["timestamp"],
-            c=sub["cluster_id"],
-            cmap="tab20",
-            marker=markers[src],
-            s=60,
-            alpha=0.8
+            sub["lon"], sub["lat"], sub["timestamp"], c=sub["cluster_id"], cmap="tab20", marker=markers[src], s=60, alpha=0.8
         )
 
     # Labels and title
@@ -63,23 +50,11 @@ def plot_clusters(df: pd.DataFrame, hazard: str) -> None:
     # Legend: Sources
     # -------------------------
     source_handles = [
-        mlines.Line2D(
-            [],
-            [],
-            color="black",
-            marker=markers[src],
-            linestyle="None",
-            markersize=8,
-            label=src
-        )
+        mlines.Line2D([], [], color="black", marker=markers[src], linestyle="None", markersize=8, label=src)
         for src in sources
     ]
 
-    legend1 = ax.legend(
-        handles=source_handles,
-        title="Source",
-        loc="upper left"
-    )
+    legend1 = ax.legend(handles=source_handles, title="Source", loc="upper left")
 
     ax.add_artist(legend1)
 

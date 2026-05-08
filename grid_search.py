@@ -1,28 +1,25 @@
-from tempfile import tempdir
 import typing
 from venv import logger
+
 import numpy as np
 import pandas as pd
-from sklearn.cluster import DBSCAN
 from hdbscan.validity import validity_index
+from sklearn.cluster import DBSCAN
 
-from models import EventData, WeightConfig, ClusterConfig
-from utils import NormalizedValues, Utils, HazardType
+from models import ClusterConfig, EventData, WeightConfig
+from utils import HazardType, NormalizedValues, Utils
 
 
 class GridSearch:
     """Grid Search of the weights and cluster configs"""
+
     @staticmethod
     def compute_components(report1: EventData, report2: EventData, hazard: HazardType) -> dict:
         """Return component scores"""
         km = Utils.haversine_km(report1.lat, report1.lon, report1.lat, report2.lon)
         hrs = abs(report1.start_timestamp - report2.start_timestamp) / 3600
 
-        spatial, temporal = NormalizedValues.normalized_mappings(
-            hazard=hazard,
-            km_value=km,
-            hrs_value=hrs
-        )
+        spatial, temporal = NormalizedValues.normalized_mappings(hazard=hazard, km_value=km, hrs_value=hrs)
 
         # if hazard == HazardType.EARTHQUAKE:
         #     spatial, temporal = NormalizedValues.normalized_mappings(
@@ -38,10 +35,7 @@ class GridSearch:
         # else:
         #     raise Exception(f"Hazard type {hazard} is not handled.")
 
-        return {
-            "spatial": spatial,
-            "temporal": temporal
-        }
+        return {"spatial": spatial, "temporal": temporal}
 
     @staticmethod
     def precompute_components(reports: typing.List[EventData], hazard: HazardType) -> tuple[list[EventData], np.ndarray]:
@@ -51,7 +45,7 @@ class GridSearch:
         n = len(subset)
         comp = np.zeros((n, n, 2))
         for i in range(n):
-            for j in range(i+1, n):
+            for j in range(i + 1, n):
                 c = GridSearch.compute_components(subset[i], subset[j], hazard)
                 v = [c["spatial"], c["temporal"]]
                 comp[i, j] = v
@@ -62,7 +56,7 @@ class GridSearch:
     def build_weight_grid() -> typing.List[WeightConfig]:
         """Build spatial and temporal weights grid"""
         spatial_steps = [0.2, 0.3, 0.4, 0.5, 0.6]
-        #temporal_steps = [0.10, 0.20, 0.30, 0.40, 0.50]
+        # temporal_steps = [0.10, 0.20, 0.30, 0.40, 0.50]
         configs = []
 
         for sp in spatial_steps:
@@ -157,16 +151,7 @@ class GridSearch:
 
         if not configurations:
             logger.info(f"Using default configuration for hazard {hazard.value}")
-            return {
-                "weight_config": {
-                    "spatial": 0.5,
-                    "temporal": 0.5
-                },
-                "cluster_config": {
-                    "eps": 0.3,
-                    "min_samples": 3
-                }
-            }
+            return {"weight_config": {"spatial": 0.5, "temporal": 0.5}, "cluster_config": {"eps": 0.3, "min_samples": 3}}
 
         sorted_data = sorted(configurations, key=lambda x: x["dbcv_score"], reverse=True)
         max_dbcv_data = sorted_data[0]
@@ -179,5 +164,5 @@ class GridSearch:
             "cluster_config": {
                 "eps": max_dbcv_data["c_cfg"].eps,
                 "min_samples": max_dbcv_data["c_cfg"].min_samples,
-            }
+            },
         }

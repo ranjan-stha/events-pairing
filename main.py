@@ -1,17 +1,17 @@
-from dataclasses import dataclass
-from pathlib import Path
 import logging
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
-from sklearn.cluster import DBSCAN
 import numpy as np
 import pandas as pd
+from sklearn.cluster import DBSCAN
 
-from utils import Utils, HazardType, ComputeScore
-from validation import GridSearchConfigs, HazardConfig
-from models import EventData, MergedEventData
 from grid_search import GridSearch
+from models import EventData, MergedEventData
 from plots import plot_clusters
+from utils import ComputeScore, HazardType, Utils
+from validation import GridSearchConfigs, HazardConfig
 
 # import warnings
 # warnings.filterwarnings("error")
@@ -22,9 +22,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Clusters:
     """Cluster builder"""
+
     METRIC: str = "precomputed"
 
     def __init__(self, events: list[EventData], configs: HazardConfig):
@@ -46,9 +48,7 @@ class Clusters:
         """Run the clustering algorithm"""
         dist_matrices = self.build_distance_matrix()
         db = DBSCAN(
-            eps=self.configs.cluster_config.eps,
-            min_samples=self.configs.cluster_config.min_samples,
-            metric=self.METRIC
+            eps=self.configs.cluster_config.eps, min_samples=self.configs.cluster_config.min_samples, metric=self.METRIC
         )
         labels = db.fit_predict(dist_matrices)
         return list(labels)
@@ -88,25 +88,13 @@ def run_pipeline(events_df: pd.DataFrame, search_configs):
 
         for label in sorted(unique_labels):
             is_noise = label == -1
-            cluster_eventdata = [ed for ed, l in zip(all_events, labels) if l==label]
+            cluster_eventdata = [ed for ed, lbl in zip(all_events, labels) if lbl == label]
             if is_noise:
                 for item in cluster_eventdata:
-                    merged.append(
-                        MergedEventData(
-                            cluster_id=-1,
-                            event_data=[item],
-                            confidence=0.0
-                        )
-                    )
+                    merged.append(MergedEventData(cluster_id=-1, event_data=[item], confidence=0.0))
             else:
-                confidence = 1 #cluster_confidence(cluster_eventdata)
-                merged.append(
-                    MergedEventData(
-                        cluster_id=label,
-                        event_data=cluster_eventdata,
-                        confidence=confidence
-                    )
-                )
+                confidence = 1  # cluster_confidence(cluster_eventdata)
+                merged.append(MergedEventData(cluster_id=label, event_data=cluster_eventdata, confidence=confidence))
 
         df_final = Utils.convert_to_df(merged=merged)
         # Saving the file as csv
@@ -114,7 +102,6 @@ def run_pipeline(events_df: pd.DataFrame, search_configs):
         df_final.to_csv(output_path, index=False)
         # Generating the plot and saving the file as png
         plot_clusters(df=df_final, hazard=hazard)
-
 
 
 if __name__ == "__main__":
@@ -136,12 +123,14 @@ if __name__ == "__main__":
     logger.info(f"Shape of Glide data: {processed_glide_data.shape}")
 
     # Add new source data for concatenation
-    processed_events_df = pd.concat([
-        processed_gdacs_data,
-        processed_emdat_data,
-        processed_pdc_data,
-        processed_glide_data,
-    ])
+    processed_events_df = pd.concat(
+        [
+            processed_gdacs_data,
+            processed_emdat_data,
+            processed_pdc_data,
+            processed_glide_data,
+        ]
+    )
     print(processed_events_df.head(5))
     # Remove fully duplicated rows
     processed_events_df.drop_duplicates(subset=["id"], keep="first", inplace=True)
@@ -159,9 +148,11 @@ if __name__ == "__main__":
         if not part_config:
             logger.warning(f"Grid configs is not available for {hazard_type.value}")
             continue
-        grid_search_configs.update({
-            hazard_type.value: part_config ## hazard.value
-        })
+        grid_search_configs.update(
+            {
+                hazard_type.value: part_config  ## hazard.value
+            }
+        )
 
     logger.info(f"Grid search configs: {grid_search_configs}")
 
