@@ -1,0 +1,54 @@
+[project]
+name = "events-pairing"
+version = "0.1.0"
+description = "Pairing of events from different sources"
+readme = "README.md"
+requires-python = ">=3.13"
+
+dependencies = [
+    "pandas>=2.2.0",
+    "matplotlib>=3.9.0",
+    "numpy>=2.0.0",
+    "scikit-learn>=1.8.0",
+    "hdbscan==0.8.42",
+    "pydantic==2.13.4",
+    "matplotlib==3.10.9",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["datasets*", "outputs*"]
+
+[tool.pyright]
+exclude = [
+    "**/__pycache__",
+    ".venv/",
+]
+extraPaths = []
+reportMissingImports = true
+reportMissingTypeStubs = false
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+line-length = 125
+extend-exclude = [
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "venv",
+    "**/migrations/*",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+ignore = ["C901", "E701", "E203"]
+extend-select = ["I", "E", "F", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"/**/tests/*_mock_data.py" = ["E501"]
+"**/snap_test_*.py" = ["E501"]

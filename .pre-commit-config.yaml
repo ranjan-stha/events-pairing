@@ -1,0 +1,81 @@
+default_language_version:
+  python: python3.13
+
+exclude: |
+    (?x)^(
+      \.git|
+      __pycache__|
+      .*snap_test_.*\.py|
+      .+\/.+\/migrations\/.*|
+      \.venv
+    )
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^helm/snapshots/
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+        args: [--unsafe]
+        exclude: ^helm/snapshots/
+      - id: debug-statements
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: detect-private-key
+      - id: name-tests-test
+      - id: debug-statements
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=100]
+
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.0.9
+    hooks:
+      # - id: helmlint
+      - id: gofmt
+
+  # Run the Ruff linter.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.8
+    hooks:
+      # Linter
+      - id: ruff
+        types_or: [python, pyi, jupyter, pyproject]
+        args: [--fix, --exit-non-zero-on-fix]
+      # Formatter
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, pyproject]
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.6.9
+    hooks:
+      - id: uv-lock
+        args: ["--locked", "--offline"]
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.396
+    hooks:
+      - id: pyright
+        verbose: true  # FIXME: Remove me after fixing all issues
+        entry: bash -c 'pyright "$@" || true' --  # FIXME: Remove me after fixing all issues
+        additional_dependencies:
+          [
+            beartype,
+            einops,
+            jax,
+            jaxtyping,
+            optax,
+            pytest,
+            typing_extensions,
+            wadler_lindig,
+          ]
