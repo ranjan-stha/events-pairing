@@ -15,6 +15,7 @@ class Source(str, Enum):
     USGS = "USGS"
     EMDAT = "EMDAT"
     PDC = "PDC"
+    GLIDE = "GLIDE"
 
 
 class HazardType(str, Enum):
@@ -26,6 +27,7 @@ class HazardType(str, Enum):
     TROPICAL_CYCLONE = "TROPICAL_CYCLONE"
     VOLCANO = "VOLCANO"
     WILDFIRE = "WILDFIRE"
+    DROUGHT = "DROUGHT"
 
 
 class Utils:
@@ -138,6 +140,7 @@ class Mappings:
             "emdat-events": Source.EMDAT.value,
             "usgs-events": Source.USGS.value,
             "pdc-events": Source.PDC.value,
+            "glide-events": Source.GLIDE.value,
         }
         return mappings.get(source)
 
@@ -146,15 +149,189 @@ class NormalizedValues:
     """Lists normalized values"""
 
     @staticmethod
-    def normalized_mappings(hazard: HazardType, km_value: float, hrs_value: float) -> tuple[float, float]:
-        """Normalized mappings"""
+    def normalized_mappings(hazard: HazardType, km_value: float, hrs_value: float) -> tuple[float | None, float | None]:
+        """Normalized mapping values for different hazards"""
         mappings_spatial = {
-            HazardType.EARTHQUAKE: (1.0 if km_value <= 20 else 0.75 if km_value <= 50 else 0.3 if km_value <= 100 else 0.0),
-            HazardType.FLOOD: (1.0 if km_value <= 30 else 0.7 if km_value <= 50 else 0.4 if km_value <= 90 else 0.0),
+            # GDACS vs EMDAT earthquake: epicenter (GDACS) vs admin centroid (EMDAT)
+            # Admin centroids can be 30-80km off in large provinces
+            HazardType.EARTHQUAKE: (
+                1.0
+                if km_value <= 25
+                # same point, minor geocoding noise
+                else 0.8
+                if km_value <= 60
+                # epicenter vs. district centroid
+                else 0.5
+                if km_value <= 120
+                # epicenter vs. province/state centroid
+                else 0.1
+                if km_value <= 200
+                # country-level aggregation (EMDAT edge case)
+                else 0.0
+            ),
+            # Floods reported at affected district centroid vs. river gauge location
+            # EMDAT especially aggregates multi-district floods to province centroid
+            HazardType.FLOOD: (
+                1.0
+                if km_value <= 15
+                else 0.7
+                if km_value <= 50
+                # district centroid drift
+                else 0.4
+                if km_value <= 120
+                # province-level aggregation
+                else 0.1
+                if km_value <= 250
+                # EMDAT national-level flood event
+                else 0.0
+            ),
+            # Cyclones: GDACS uses current eye position, PDC may use landfall point
+            # Track displacement between reports can be significant
+            HazardType.TROPICAL_CYCLONE: (
+                1.0
+                if km_value <= 50
+                # same eye position, timing difference
+                else 0.7
+                if km_value <= 150
+                # track segment displacement
+                else 0.4
+                if km_value <= 350
+                # landfall vs. origin point
+                else 0.0
+            ),
+            # Tsunamis: source location (GDACS) vs. impact location (EMDAT)
+            # Can be hundreds of km apart — earthquake origin vs. coastal impact zone
+            # HazardType.TSUNAMI: (
+            #     1.0 if km_value <= 30 else
+            #     0.6 if km_value <= 100 else
+            #     0.4 if km_value <= 300 else  # source vs. impact zone mismatch
+            #     0.1 if km_value <= 600 else  # trans-oceanic source vs. distant impact
+            #     0.0
+            # ),
+            HazardType.WILDFIRE: (
+                1.0
+                if km_value <= 10
+                else 0.6
+                if km_value <= 40
+                # perimeter centroid shift as fire grows
+                else 0.2
+                if km_value <= 80
+                else 0.0
+            ),
+            HazardType.DROUGHT: (
+                1.0
+                if km_value <= 100
+                # admin region centroids expected to differ widely
+                else 0.7
+                if km_value <= 300
+                else 0.4
+                if km_value <= 600
+                else 0.0
+            ),
+            HazardType.VOLCANO: (
+                1.0
+                if km_value <= 10
+                # volcano location is fixed and precise
+                else 0.6
+                if km_value <= 30
+                # impact zone centroid vs. vent
+                else 0.2
+                if km_value <= 80
+                else 0.0
+            ),
         }
+
+        # Temporal thresholds should reflect:
+        # - Source reporting latency (how long after event onset does each source publish)
+        # - Update cycles (GDACS updates hourly, EMDAT may finalize months later)
+        # - Whether the "event date" in the source is onset, peak, or report date
+
         mappings_temporal = {
-            HazardType.EARTHQUAKE: (1.0 if hrs_value <= 1 else 0.7 if hrs_value <= 6 else 0.3 if hrs_value <= 24 else 0.0),
-            HazardType.FLOOD: (1.0 if hrs_value <= 12 else 0.7 if hrs_value <= 24 else 0.4 if hrs_value <= 48 else 0.0),
+            # GDACS: ~1-2hr lag | PDC: ~2-6hr | GLIDE: 1-7 days | EMDAT: weeks-months
+            # A 72hr window is needed to catch GLIDE registrations of fast events
+            HazardType.EARTHQUAKE: (
+                1.0
+                if hrs_value <= 6
+                # GDACS/PDC same-event window
+                else 0.8
+                if hrs_value <= 24
+                # GLIDE registration lag
+                else 0.5
+                if hrs_value <= 72
+                # slow source ingestion
+                else 0.1
+                if hrs_value <= 168
+                # EMDAT preliminary entry lag
+                else 0.0
+            ),
+            # Floods have onset ambiguity — sources disagree on "start date"
+            # EMDAT uses onset of impact, GDACS uses trigger (rainfall peak), PDC uses forecast
+            HazardType.FLOOD: (
+                1.0
+                if hrs_value <= 12
+                else 0.8
+                if hrs_value <= 48
+                # onset date ambiguity across sources
+                else 0.5
+                if hrs_value <= 120
+                # slow-onset flood, EMDAT vs GDACS divergence
+                else 0.2
+                if hrs_value <= 240
+                # GLIDE/EMDAT finalization lag
+                else 0.0
+            ),
+            # Cyclones: all sources track these well but use different reference points
+            # (formation vs. named storm vs. landfall vs. dissipation)
+            HazardType.TROPICAL_CYCLONE: (
+                1.0
+                if hrs_value <= 12
+                else 0.7
+                if hrs_value <= 48
+                # formation vs. landfall date used differently
+                else 0.4
+                if hrs_value <= 96
+                # EMDAT records landfall date only
+                else 0.0
+            ),
+            # HazardType.TSUNAMI: (
+            #     1.0 if hrs_value <= 6 else
+            #     0.6 if hrs_value <= 24 else
+            #     0.2 if hrs_value <= 72 else   # EMDAT lag for distant-impact tsunamis
+            #     0.0
+            # ),
+            HazardType.WILDFIRE: (
+                1.0
+                if hrs_value <= 12
+                else 0.6
+                if hrs_value <= 48
+                else 0.3
+                if hrs_value <= 120
+                # EMDAT records fire season aggregates
+                else 0.0
+            ),
+            # Drought: EMDAT onset dates are estimated retrospectively
+            # Cross-source temporal matching is inherently loose
+            HazardType.DROUGHT: (
+                1.0
+                if hrs_value <= 720
+                # 30 days — onset date estimation error
+                else 0.6
+                if hrs_value <= 2160
+                # 90 days
+                else 0.3
+                if hrs_value <= 4320
+                else 0.0
+            ),
+            HazardType.VOLCANO: (
+                1.0
+                if hrs_value <= 12
+                else 0.6
+                if hrs_value <= 48
+                else 0.3
+                if hrs_value <= 168
+                # EMDAT records eruption episodes, not onset
+                else 0.0
+            ),
         }
         return (mappings_spatial.get(hazard), mappings_temporal.get(hazard))
 
@@ -174,22 +351,6 @@ class ComputeScore:
         spatial, temporal = NormalizedValues.normalized_mappings(
             hazard=HazardType.EARTHQUAKE, km_value=self.km, hrs_value=self.hrs
         )
-
-        # # Spatial
-        # spatial = (
-        #     1.0 if self.km <= 50 else
-        #     0.75 if self.km <= 100 else
-        #     0.4 if self.km <= 200 else
-        #     0.05
-        # )
-
-        # # Temporal
-        # temporal = (
-        #     1.0 if self.hrs <= 12 else
-        #     0.7 if self.hrs <= 24 else
-        #     0.4 if self.hrs <= 48 else
-        #     0.05
-        # )
         return spatial * spatial_weight + temporal * temporal_weight
 
     def _score_flood(self, spatial_weight: float, temporal_weight: float) -> float:
@@ -197,20 +358,6 @@ class ComputeScore:
         spatial, temporal = NormalizedValues.normalized_mappings(
             hazard=HazardType.FLOOD, km_value=self.km, hrs_value=self.hrs
         )
-        # # Spatial
-        # spatial = (
-        #     1.0 if self.km <= 50 else
-        #     0.75 if self.km <= 100 else
-        #     0.4 if self.km <= 200 else
-        #     0.05
-        # )
-        # # Temporal
-        # temporal = (
-        #     1.0 if self.hrs <= 24 else
-        #     0.7 if self.hrs <= 48 else
-        #     0.4 if self.hrs <= 72 else
-        #     0.05
-        # )
         return spatial * spatial_weight + temporal * temporal_weight
 
     def compute_distance(self, configs: HazardConfig) -> float:

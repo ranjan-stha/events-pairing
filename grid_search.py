@@ -21,27 +21,13 @@ class GridSearch:
 
         spatial, temporal = NormalizedValues.normalized_mappings(hazard=hazard, km_value=km, hrs_value=hrs)
 
-        # if hazard == HazardType.EARTHQUAKE:
-        #     spatial, temporal = NormalizedValues.normalized_mappings(
-        #         hazard=hazard,
-        #         km_value=km,
-        #         hrs_value=hrs
-        #     )
-        #     # spatial = 1.0 if km<=20 else 0.75 if km<=50 else 0.4 if km<=100 else 0.0
-        #     # temporal = 1.0 if hrs<=1 else 0.7 if hrs<=6 else 0.4 if hrs<=24 else 0.0
-        # elif hazard == HazardType.FLOOD:
-        #     spatial = 1.0 if km<=50 else 0.75 if km<=100 else 0.4 if km<=200 else 0.1
-        #     temporal = 1.0 if hrs<=24 else 0.7 if hrs<=48 else 0.4 if hrs<=72 else 0.1
-        # else:
-        #     raise Exception(f"Hazard type {hazard} is not handled.")
-
         return {"spatial": spatial, "temporal": temporal}
 
     @staticmethod
     def precompute_components(reports: typing.List[EventData], hazard: HazardType) -> tuple[list[EventData], np.ndarray]:
         """Get the component scores of all the events with same hazard type"""
         subset = [r for r in reports if r.hazard_type == hazard.value]
-        print(len(subset), subset[:5])
+        logger.info(f"Total event records for {hazard.value} is {len(subset)}")
         n = len(subset)
         comp = np.zeros((n, n, 2))
         for i in range(n):
@@ -56,7 +42,6 @@ class GridSearch:
     def build_weight_grid() -> typing.List[WeightConfig]:
         """Build spatial and temporal weights grid"""
         spatial_steps = [0.2, 0.3, 0.4, 0.5, 0.6]
-        # temporal_steps = [0.10, 0.20, 0.30, 0.40, 0.50]
         configs = []
 
         for sp in spatial_steps:
@@ -68,7 +53,7 @@ class GridSearch:
     def build_cluster_grid() -> typing.List[ClusterConfig]:
         """Generate DBSCAN hyperparameter candidates."""
         configs = []
-        for eps in [0.1, 0.15, 0.20, 0.30, 0.40, 0.50]:
+        for eps in [0.10, 0.15, 0.20, 0.30, 0.40]:
             for min_pts in [2, 3]:
                 configs.append(ClusterConfig(eps, min_pts))
         return configs
@@ -120,25 +105,19 @@ class GridSearch:
             for row in postprocessed_df.itertuples(index=False)
         ]
         subset, comp = GridSearch.precompute_components(reports=all_events, hazard=hazard)
-        # TODO put a constraint on the length of subset
+
         weight_grid = GridSearch.build_weight_grid()
         cluster_grid = GridSearch.build_cluster_grid()
 
-        # total_comb = len(weight_grid) * len(cluster_grid)
         configurations = []
         for w_cfg in weight_grid:
             D = GridSearch.distance_matrix_from_weights(comp, w_cfg)
             for c_cfg in cluster_grid:
-                print(f"eps: {c_cfg.eps}")
-                print(f"min samples: {c_cfg.min_samples}")
                 db_clusters = DBSCAN(eps=c_cfg.eps, min_samples=c_cfg.min_samples, metric="precomputed")
                 labels = db_clusters.fit_predict(D)
-                print(labels)
-                print(np.unique(labels).tolist())
                 try:
                     dbcv_score = GridSearch.compute_dbcv(D, labels)
-                    print(dbcv_score, w_cfg, c_cfg)
-                    if dbcv_score > 0.3:
+                    if dbcv_score >= 0.5:
                         configuration = {
                             "labels": labels,
                             "w_cfg": w_cfg,

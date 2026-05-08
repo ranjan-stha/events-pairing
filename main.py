@@ -1,4 +1,5 @@
 import logging
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +14,7 @@ from plots import plot_clusters
 from utils import ComputeScore, HazardType, Utils
 from validation import GridSearchConfigs, HazardConfig
 
-# import warnings
-# warnings.filterwarnings("error")
+warnings.filterwarnings("error")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -110,17 +110,20 @@ if __name__ == "__main__":
     emdat_data = Utils.load_data(file_path="./datasets/emdat_2024_2025_data.json")
     pdc_data = Utils.load_data(file_path="./datasets/pdc_2020_2025_data.json")
     glide_data = Utils.load_data(file_path="./datasets/glide_2020_2025_data.json")
+    usgs_data = Utils.load_data(file_path="./datasets/usgs_2025_2025_data.json")
 
     # Add new source data processing here
     processed_gdacs_data = Utils.preprocess_data(event_data=gdacs_data)
     processed_emdat_data = Utils.preprocess_data(event_data=emdat_data)
     processed_pdc_data = Utils.preprocess_data(event_data=pdc_data)
     processed_glide_data = Utils.preprocess_data(event_data=glide_data)
+    processed_usgs_data = Utils.preprocess_data(event_data=usgs_data)
 
     logger.info(f"Shape of GDACS data: {processed_gdacs_data.shape}")
     logger.info(f"Shape of EMDAT data: {processed_emdat_data.shape}")
     logger.info(f"Shape of PDC data: {processed_pdc_data.shape}")
     logger.info(f"Shape of Glide data: {processed_glide_data.shape}")
+    logger.info(f"Shape of USGS data: {processed_usgs_data.shape}")
 
     # Add new source data for concatenation
     processed_events_df = pd.concat(
@@ -129,9 +132,9 @@ if __name__ == "__main__":
             processed_emdat_data,
             processed_pdc_data,
             processed_glide_data,
+            processed_usgs_data,
         ]
     )
-    print(processed_events_df.head(5))
     # Remove fully duplicated rows
     processed_events_df.drop_duplicates(subset=["id"], keep="first", inplace=True)
     # Reset dataframe index
@@ -142,7 +145,8 @@ if __name__ == "__main__":
 
     for hazard_type in HazardType:
         logger.info(f"Processing {hazard_type}")
-        if not hazard_type.value == "EARTHQUAKE":
+        # TODO: remove the below condition or put additional constraints
+        if not hazard_type == HazardType.EARTHQUAKE:
             continue
         part_config = GridSearch.run_grid_search(events_df=processed_events_df, hazard=hazard_type)
         if not part_config:
