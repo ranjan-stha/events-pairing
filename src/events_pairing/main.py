@@ -8,11 +8,12 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN
 
-from grid_search import GridSearch
-from models import EventData, MergedEventData
-from plots import plot_clusters
-from utils import ComputeScore, HazardType, Utils
-from validation import GridSearchConfigs, HazardConfig
+from events_pairing.grid_search import GridSearch
+from events_pairing.models import EventData, MergedEventData
+from events_pairing.plots import plot_clusters
+from events_pairing.utils import ComputeScore, HazardType, Utils
+from events_pairing.validation import GridSearchConfigs, HazardConfig
+from events_pairing.paths import DATASETS_DIR, OUTPUTS_DIR
 
 warnings.filterwarnings("error")
 
@@ -98,7 +99,7 @@ def run_pipeline(events_df: pd.DataFrame, search_configs):
 
         df_final = Utils.convert_to_df(merged=merged)
         # Saving the file as csv
-        output_path = Path(".") / "outputs" / f"{hazard}_{datetime.today().date().isoformat()}_clustered_events.csv"
+        output_path = Path(".") / OUTPUTS_DIR / f"{hazard}_{datetime.today().date().isoformat()}_clustered_events.csv"
         df_final.to_csv(output_path, index=False)
         # Generating the plot and saving the file as png
         plot_clusters(df=df_final, hazard=hazard)
@@ -106,11 +107,11 @@ def run_pipeline(events_df: pd.DataFrame, search_configs):
 
 if __name__ == "__main__":
     # Add new data source here
-    gdacs_data = Utils.load_data(file_path="./datasets/gdacs_2020_2025_data.json")
-    emdat_data = Utils.load_data(file_path="./datasets/emdat_2024_2025_data.json")
-    pdc_data = Utils.load_data(file_path="./datasets/pdc_2020_2025_data.json")
-    glide_data = Utils.load_data(file_path="./datasets/glide_2020_2025_data.json")
-    usgs_data = Utils.load_data(file_path="./datasets/usgs_2025_2025_data.json")
+    gdacs_data = Utils.load_data(file_path=DATASETS_DIR / "gdacs_2020_2025_data.json")
+    emdat_data = Utils.load_data(file_path=DATASETS_DIR / "emdat_2024_2025_data.json")
+    pdc_data = Utils.load_data(file_path=DATASETS_DIR / "pdc_2020_2025_data.json")
+    glide_data = Utils.load_data(file_path=DATASETS_DIR / "glide_2020_2025_data.json")
+    usgs_data = Utils.load_data(file_path=DATASETS_DIR / "usgs_2025_2025_data.json")
 
     # Add new source data processing here
     processed_gdacs_data = Utils.preprocess_data(event_data=gdacs_data)

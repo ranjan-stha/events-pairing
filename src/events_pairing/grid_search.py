@@ -6,8 +6,8 @@ import pandas as pd
 from hdbscan.validity import validity_index
 from sklearn.cluster import DBSCAN
 
-from models import ClusterConfig, EventData, WeightConfig
-from utils import HazardType, NormalizedValues, Utils
+from events_pairing.models import ClusterConfig, EventData, WeightConfig
+from events_pairing.utils import HazardType, NormalizedValues, Utils
 
 
 class GridSearch:

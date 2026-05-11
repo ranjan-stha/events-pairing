@@ -1,11 +1,12 @@
 import json
 import math
 from enum import Enum
-
+from pathlib import Path
 import pandas as pd
 
-from models import EventData, MergedEventData
-from validation import HazardConfig
+
+from events_pairing.models import EventData, MergedEventData
+from events_pairing.validation import HazardConfig
 
 
 class Source(str, Enum):
@@ -44,7 +45,7 @@ class Utils:
         return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     @staticmethod
-    def load_data(file_path: str) -> dict:
+    def load_data(file_path: Path) -> dict:
         """Load the data from the file"""
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.loads(f.read())
