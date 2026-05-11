@@ -2,8 +2,8 @@ import json
 import math
 from enum import Enum
 from pathlib import Path
-import pandas as pd
 
+import pandas as pd
 
 from events_pairing.models import EventData, MergedEventData
 from events_pairing.validation import HazardConfig

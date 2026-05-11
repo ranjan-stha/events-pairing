@@ -10,10 +10,10 @@ from sklearn.cluster import DBSCAN
 
 from events_pairing.grid_search import GridSearch
 from events_pairing.models import EventData, MergedEventData
+from events_pairing.paths import DATASETS_DIR, OUTPUTS_DIR
 from events_pairing.plots import plot_clusters
 from events_pairing.utils import ComputeScore, HazardType, Utils
 from events_pairing.validation import GridSearchConfigs, HazardConfig
-from events_pairing.paths import DATASETS_DIR, OUTPUTS_DIR
 
 warnings.filterwarnings("error")
 
